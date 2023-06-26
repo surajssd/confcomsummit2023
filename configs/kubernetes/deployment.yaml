@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triton
+  namespace: default
+  labels:
+    app: triton
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triton
+  template:
+    metadata:
+      labels:
+        app: triton
+    spec:
+      runtimeClassName: kata-remote
+      initContainers:
+      - name: attest-download-models
+        image: quay.io/surajd/inference-model-setup:latest
+        env:
+        - name: KBS_URL
+          # # Giving service name does not work.
+          # value: "http://kbs.coco-tenant:8080"
+          # Got the IP address of the pod by running: `kubectl get pods -o wide -n coco-tenant`.
+          value: ""
+        - name: KBS_RESOURCE_ID
+          value: "/reponame/workload_key/key.bin"
+        - name: SYMMETRIC_KEY_FILE
+          value: "/tmp/key.bin"
+        - name: TARGET_FOLDER
+          value: "/data"
+        - name: ENCRYPTED_FILE_URL
+          value: ""
+        volumeMounts:
+        - name: models
+          mountPath: /data
+      containers:
+      - name: triton
+        image: nvcr.io/nvidia/tritonserver:22.05-py3
+        ports:
+        - containerPort: 8000
+        command:
+        - /opt/tritonserver/bin/tritonserver
+        args:
+        - --model-repository
+        - /data/models
+        volumeMounts:
+        - name: models
+          mountPath: /data
+      volumes:
+      - name: models
+        emptyDir:
+          medium: Memory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: triton
+  name: triton
+  namespace: default
+spec:
+  ports:
+  - port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: triton
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: triton
+  namespace: default
+  annotations:
+    kubernetes.io/ingress.class: addon-http-application-routing
+spec:
+  rules:
+  # az aks show --resource-group "${AZURE_RESOURCE_GROUP}" \
+  # --name "${CLUSTER_NAME}" \
+  # --query addonProfiles.httpApplicationRouting.config.HTTPApplicationRoutingZoneName -o table
+  - host: triton.<CLUSTER_SPECIFIC_DNS_ZONE>
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: triton
+            port:
+              number: 8000
