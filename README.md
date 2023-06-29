@@ -159,3 +159,7 @@ python image_client.py \
     -c 3 -s INCEPTION /tmp/cat \
     -u triton.a6ecc31aa89e4bf889d5.eastus.aksapp.io
 ```
+
+## Watch recording
+
+[![Alt text](https://img.youtube.com/vi/UOQZKiMCu00/0.jpg)](https://www.youtube.com/watch?v=UOQZKiMCu00)
